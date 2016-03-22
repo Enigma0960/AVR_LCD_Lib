@@ -5,6 +5,8 @@
 
 #include <avr/io.h>
 #include <util/delay.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "Util.h"
 
@@ -46,6 +48,12 @@
 #define LCD_5x10DOTS 0x04
 #define LCD_5x8DOTS 0x00
 
+//Print
+#define DEC 10
+#define HEX 16
+#define OCT 8
+#define BIN 2
+
 class LCD {
 public:
 	LCD(uint8_t rs, uint8_t enable, uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3, uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7);
@@ -76,14 +84,30 @@ public:
 	void setRowOffsets(int row0, int row1, int row2, int row3);
 	void createChar(uint8_t location, uint8_t charmap[]);
 	void setCursor(uint8_t cols, uint8_t rows);
-	void write(uint8_t value);
+	size_t write(uint8_t value);
 	void command(uint8_t value);
+	
+	size_t write(const char* str);
+	size_t write(const char* buffer, size_t size);
+	size_t write(const uint8_t* buffer, size_t size);
+	
+	size_t print(const char str[]);
+	size_t print(char c);
+	size_t print(unsigned char b, int base = DEC);
+	size_t print(int n, int base = DEC);
+	size_t print(unsigned int n, int base = DEC);
+	size_t print(long n, int base = DEC);
+	size_t print(unsigned long n, int base = DEC);
+	size_t print(double n, int digits = 2);
 	
 private:
 	void send(uint8_t value, uint8_t mode);
 	void write4bits(uint8_t value);
 	void write8bits(uint8_t value);
 	void pulseEnable();
+
+	size_t printNumber(unsigned long number, uint8_t base);
+	size_t printFloat(double number, uint8_t digits);
 
 	uint8_t pinRS;
 	uint8_t pinRW;

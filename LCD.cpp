@@ -1,5 +1,7 @@
 #include "LCD.h"
 
+//#define strlen(n) sizeof(n) / sizeof(const char)
+
 LCD::LCD(uint8_t rs, uint8_t enable, uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3, uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7) {
 	init(0, rs, 255, enable, d0, d1, d2, d3, d4, d5, d6, d7);
 }
@@ -181,7 +183,7 @@ void LCD::createChar(uint8_t location, uint8_t charmap[]) {
 }
 
 void LCD::setCursor(uint8_t cols, uint8_t rows) {
-	const int max_lines = sizeof(rowOffsets) / sizeof(*rowOffsets);
+	const size_t max_lines = sizeof(rowOffsets) / sizeof(*rowOffsets);
 	if ( rows >= max_lines )
 		rows = max_lines - 1;
 	if ( rows >= numLines )
@@ -190,8 +192,9 @@ void LCD::setCursor(uint8_t cols, uint8_t rows) {
 	command(LCD_SETDDRAMADDR | (cols + rowOffsets[rows]));
 }
 
-void LCD::write(uint8_t value) {
+size_t LCD::write(uint8_t value) {
 	send(value, HIGH);
+	return 1;
 }
 
 void LCD::command(uint8_t value) {
@@ -231,4 +234,118 @@ void LCD::pulseEnable() {
 	_delay_us(1);
 	pinOut(pinE, LOW);
 	_delay_us(100);
+}
+
+/*-------------------------------------------*/
+
+size_t LCD::write(const char* str) {
+	if (str == NULL) return 0;
+	return write((const uint8_t *)str, strlen(str));
+}
+
+size_t LCD::write(const char* buffer, size_t size) {
+	return write((const uint8_t *)buffer, size);
+}
+
+size_t LCD::write(const uint8_t* buffer, size_t size) {
+	size_t n = 0;
+	while (size--)
+		if (write(*buffer++)) n++;
+		else break;
+	return n;
+}
+
+size_t LCD::print(const char str[]) {
+	return write(str);
+}
+
+size_t LCD::print(char c) {
+	return write(c);
+}
+
+size_t LCD::print(unsigned char b, int base) {
+	return print((unsigned long) b, base);
+}
+
+size_t LCD::print(int n, int base) {
+	return print((long) n, base);
+}
+
+size_t LCD::print(unsigned int n, int base) {
+	return print((unsigned long) n, base);
+}
+
+size_t LCD::print(long n, int base) {
+	if (base == 0) {
+		return write(n);
+	} else if (base == 10) {
+		if (n < 0) {
+			int t = print('-');
+			n = -n;
+			return printNumber(n, 10) + t;
+		}
+		return printNumber(n, 10);
+	} else return printNumber(n, base);
+}
+
+size_t LCD::print(unsigned long n, int base) {
+	if (base == 0) return write(n);
+	else return printNumber(n, base);
+}
+
+size_t LCD::print(double n, int digits) {
+	return printFloat(n, digits);
+}
+
+size_t LCD::printNumber(unsigned long number, uint8_t base) {
+	char buf[8 * sizeof(long) + 1];
+	char* str = &buf[sizeof(buf) - 1];
+
+	*str = '\0';
+
+	if (base < 2) base = 10;
+
+	do {
+		unsigned long m = number;
+		number /= base;
+		char c = m - base * number;
+		*--str = c < 10 ? c + '0' : c + 'A' - 10;
+	} while(number);
+
+	return write(str);
+}
+
+size_t LCD::printFloat(double number, uint8_t digits) {
+	size_t n = 0;
+	
+	if (isnan(number)) return print("nan");
+	if (isinf(number)) return print("inf");
+	if (number > 4294967040.0) return print ("ovf");
+	if (number <-4294967040.0) return print ("ovf");
+	
+	if (number < 0.0) {
+		n += print('-');
+		number = -number;
+	}
+
+	double rounding = 0.5;
+	for (uint8_t i=0; i<digits; i++)
+	rounding /= 10.0;
+	
+	number += rounding;
+
+	unsigned long int_part = (unsigned long)number;
+	double remainder = number - (double)int_part;
+	n += print(int_part);
+
+	if (digits > 0) n += print(".");
+
+	while (digits-- > 0) {
+		remainder *= 10.0;
+		int toPrint = int(remainder);
+		n += print(toPrint);
+		remainder -= toPrint;
+	}
+	
+	return n;
 }
